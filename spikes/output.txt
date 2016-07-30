@@ -1,0 +1,60 @@
+Damage Control II 32820
+     PE1-R1 665
+     GXK-7F 336
+     Amamake 222
+     Arzad 209
+     M-OEE8 169
+Nanite Repair Paste 27974
+     PE1-R1 896
+     Amamake 264
+     Arzad 261
+     GXK-7F 226
+     Huola 226
+Drone Damage Amplifier II 23814
+     4DH-ST 231
+     C-BHDN 229
+     O5-YNW 153
+     Arzad 125
+     SWBV-2 97
+Ballistic Control System II 19924
+     PE1-R1 774
+     C-FD0D 178
+     NSI-MW 175
+     Palas 152
+     VYJ-DA 130
+Adaptive Invulnerability Field II 18831
+     PE1-R1 386
+     J200727 142
+     Oijanen 140
+     J110145 134
+     NSI-MW 128
+Nanofiber Internal Structure II 18643
+     Thera 256
+     J110145 111
+     M-OEE8 106
+     Arzad 99
+     J200727 96
+Republic Fleet EMP S 18248
+     Madirmilire 377
+     C-BHDN 281
+     01B-88 214
+     PE1-R1 202
+     GXK-7F 149
+Large Shield Extender II 15235
+     Oijanen 215
+     VYJ-DA 146
+     NSI-MW 139
+     SF-XJS 116
+     Z-SR1I 108
+Void S 15093
+     Latari 274
+     Palas 263
+     Azer 225
+     Vlillirier 218
+     Ashab 195
+5MN Y-T8 Compact Microwarpdrive 14354
+     PE1-R1 217
+     Thera 165
+     Arzad 112
+     Amamake 101
+     M-OEE8 95
