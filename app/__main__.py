@@ -40,11 +40,12 @@ with sde() as cur:
     cur.execute("select regionID from mapRegions")
     all_regions = [r[0] for r in cur.fetchall()]
 
+regions = all_regions
 epoc = datetime.datetime.today() - datetime.timedelta(days=2)
-kills = ZKillboardRDPExtractor(all_regions, epoc, 1)()
+kills = ZKillboardRDPExtractor(regions, epoc, 5)()
 demand_count = Counter(demand(kills))
-item_ids = [d.type_id for d, _ in demand_count.most_common(30)]
-orders = CrestOrderSnapshotExtractor([10000065, 10000058], item_ids, ["sell"])()
+item_ids = [d.type_id for d, _ in demand_count.most_common(50)]
+orders = CrestOrderSnapshotExtractor(regions, item_ids, ["sell"])()
 supply_count = Counter()
 for s, volume in supply(orders):
     supply_count[s] += volume
