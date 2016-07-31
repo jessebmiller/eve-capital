@@ -29,6 +29,12 @@ MarketStats
 """
 
 
+import datetime
+import json
+import os
+import requests
+
+
 class Extractor:
 
     def expected(self):
@@ -48,25 +54,64 @@ class Extractor:
 
 def daterange(start_date, end_date):
     for n in range(int ((end_date - start_date).days)):
-        yield start_date + timedelta(n)
+        yield start_date + datetime.timedelta(n)
+
 
 class ZKillboardRDPExtractor(Extractor):
     """ ZKillboard api calls covering region, day and page spaces """
+    time_fmt = "%Y%m%d%M%S" # weird zkillboard time format.
+    separator = "-"
+    namespace = "ns"
+    base_path = "/extracts/zkillboard_rdp"
 
-    def __init__(regions, epoch_date, pages, end_date=datetime.date.max):
+    def __init__(self, regions, epoch_datetime, pages, end_datetime=datetime.datetime.max):
         self.regions = regions
-        self.epoch_date = epoch_date
+        self.epoch_datetime = epoch_datetime
         self.pages = pages
-        self.end_date = end_date
+        self.end_date = end_datetime
 
     def expected(self):
         end_date = min(
             self.end_date,
-            datetime.date.today() - datetime.timedelta(days=1),
+            datetime.datetime.today() - datetime.timedelta(days=1),
         )
-        tripples = [
-            (r, d, p)
+        extract_space = [
+            (self.namespace, str(r), d.strftime(self.time_fmt), str(p))
             for r in self.regions
-            for d in daterange(self.epoch_date, end_date)
+            for d in daterange(self.epoch_datetime, end_date)
+            for p in range(self.pages)
+        ]
+        extract_ids = (self.separator.join(x) for x in extract_space)
+        return set(extract_ids)
 
+    def completed(self):
+        extract_ids = os.listdir(self.base_path)
+        return set(extract_ids)
+
+    def extract(self, extract_id):
+        """ extract ids are ns.region.date.page """
+        ns, region, dt, page = extract_id.split(self.separator)
+        start_time = datetime.datetime.strptime(dt, self.time_fmt).replace(
+            hour=0,
+            minute=0,
+            second=0,
+        )
+        end_time = datetime.datetime.strptime(dt, self.time_fmt).replace(
+            hour=23,
+            minute=59,
+            second=59,
+        )
+        api_url = "https://zkillboard.com/api/kills/regionID/{}/page/{}/startTime/{}/endTime/{}/".format(
+            region,
+            page,
+            start_time.strftime(self.time_fmt),
+            end_time.strftime(self.time_fmt),
+        )
+        print("requesting:", api_url)
+        killmails = requests.get(api_url).json()
+        print("got {} killmails".format(len(killmails)))
+        path = "{}/{}".format(self.base_path, extract_id)
+        with open(path, "w") as f:
+            f.write(json.dumps(killmails))
+        return True
 
