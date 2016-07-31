@@ -105,7 +105,7 @@ class ZKillboardRDPExtractor(Extractor):
         api_url = ("https://zkillboard.com/api/kills/"
                    "regionID/{}/page/{}/startTime/{}/endTime/{}/").format(
                        region,
-                       page,
+                       str(int(page) + 1), # zkillboard does not start at 0
                        start_time.strftime(self.time_fmt),
                        end_time.strftime(self.time_fmt),
                    )
@@ -119,4 +119,3 @@ class ZKillboardRDPExtractor(Extractor):
         with open(path, "w") as f:
             f.write(json.dumps(killmails))
         return True
-
