@@ -48,6 +48,7 @@ class Extractor:
 
     def __call__(self):
         missing_extract_ids = self.expected() - self.completed()
+        print("missing {} extracts".format(len(missing_extract_ids)))
         for extract_id in missing_extract_ids:
             self.extract(extract_id)
 
@@ -66,7 +67,7 @@ class ZKillboardRDPExtractor(Extractor):
 
     def __init__(self, regions, epoch_datetime, pages, end_datetime=datetime.datetime.max):
         self.regions = regions
-        self.epoch_datetime = epoch_datetime
+        self.epoch_datetime = epoch_datetime.replace(hour=0, minute=0, second=0)
         self.pages = pages
         self.end_date = end_datetime
 
@@ -101,14 +102,18 @@ class ZKillboardRDPExtractor(Extractor):
             minute=59,
             second=59,
         )
-        api_url = "https://zkillboard.com/api/kills/regionID/{}/page/{}/startTime/{}/endTime/{}/".format(
-            region,
-            page,
-            start_time.strftime(self.time_fmt),
-            end_time.strftime(self.time_fmt),
-        )
+        api_url = ("https://zkillboard.com/api/kills/"
+                   "regionID/{}/page/{}/startTime/{}/endTime/{}/").format(
+                       region,
+                       page,
+                       start_time.strftime(self.time_fmt),
+                       end_time.strftime(self.time_fmt),
+                   )
         print("requesting:", api_url)
-        killmails = requests.get(api_url).json()
+        response = requests.get(api_url)
+        if response.status_code != 200:
+            return False
+        killmails = response.json()
         print("got {} killmails".format(len(killmails)))
         path = "{}/{}".format(self.base_path, extract_id)
         with open(path, "w") as f:
