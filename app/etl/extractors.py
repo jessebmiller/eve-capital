@@ -35,22 +35,117 @@ import os
 import requests
 
 
-class Extractor:
+class JsonFileExtractor:
+    namespace = "jf"
+    separator = '|'
 
     def expected(self):
         raise NotImplementedError
 
     def completed(self):
-        raise NotImplementedError
+        extract_ids = os.listdir(self.base_path)
+        return set(extract_ids)
 
     def extract(self, extract_id):
         raise NotImplementedError
 
+    def data(self):
+        for extract_id in self.completed():
+            with open(os.path.join(self.base_path, extract_id), 'r') as f:
+                d = f.read()
+                for x in json.loads(d):
+                    yield x
+
     def __call__(self):
         missing_extract_ids = self.expected() - self.completed()
-        print("missing {} extracts".format(len(missing_extract_ids)))
+        print("missing {} extracts from {}".format(
+            len(missing_extract_ids),
+            self.base_path,
+        ))
         for extract_id in missing_extract_ids:
             self.extract(extract_id)
+        return self
+
+
+class CrestOrderSnapshotExtractor(JsonFileExtractor):
+    """
+    crest api calls creating a snapshot if we don't have a current one
+
+    Snapshots across region, type dimentions
+
+    """
+
+    year = False
+    month = False
+    day = False
+    hour = True
+    minute = True
+    second = True
+    microsecond = True
+    base_path = "/extracts/crest_order_snapshot"
+    host = "https://crest-tq.eveonline.com"
+    path = "/market/{}/orders/{}/?type=https://crest-tq.eveonline.com/inventory/types/{}/"
+
+    def __init__(self, regions, item_ids, order_types=["buy", "sell"]):
+        self.item_ids = item_ids
+        self.regions = regions
+        self.order_types = order_types
+
+    def expected(self):
+        time_replacements = {}
+        if self.year:
+            time_replacements['year'] = 9999
+        if self.month:
+            time_replacements['month'] = 1
+        if self.day:
+            time_replacements['day'] = 1
+        if self.hour:
+            time_replacements['hour'] = 0
+        if self.minute:
+            time_replacements['minute'] = 0
+        if self.second:
+            time_replacements['second'] = 0
+        if self.microsecond:
+            time_replacements['microsecond'] = 0
+
+        snapshot_time = datetime.datetime.now().replace(**time_replacements)
+        extract_space = [
+            (self.namespace, snapshot_time.isoformat(), str(r), ot, str(i))
+            for r in self.regions
+            for i in self.item_ids
+            for ot in self.order_types
+        ]
+        extract_ids = (self.separator.join(x) for x in extract_space)
+        return set(extract_ids)
+
+    def extract(self, extract_id):
+        ns, dt, region_id, o_type, type_id = extract_id.split(self.separator)
+        orders = []
+        locations = {}
+        next = self.host + self.path.format(region_id, o_type, type_id)
+        while next:
+            print("requesting:", next)
+            resp = requests.get(next)
+            if resp.status_code != 200:
+                continue
+            resp = resp.json()
+            print("got {} orders".format(len(resp['items'])))
+            for order in resp['items']:
+                href = order['location']['href']
+                if not locations.get(href, None):
+                    print("requesting:", href)
+                    solar_system_resp = requests.get(href)
+                    if solar_system_resp.status_code == 200:
+                        locations[href] = solar_system_resp.json()['solarSystem']['id']
+                    else:
+                        locations[href] = None
+                order['solarSystemID'] = locations[href]
+            orders += resp['items']
+            next = resp.get('next', None)
+
+        with open(os.path.join(self.base_path, extract_id), 'w') as f:
+            f.write(json.dumps(orders))
+        return True
 
 
 def daterange(start_date, end_date):
@@ -58,11 +153,9 @@ def daterange(start_date, end_date):
         yield start_date + datetime.timedelta(n)
 
 
-class ZKillboardRDPExtractor(Extractor):
+class ZKillboardRDPExtractor(JsonFileExtractor):
     """ ZKillboard api calls covering region, day and page spaces """
     time_fmt = "%Y%m%d%M%S" # weird zkillboard time format.
-    separator = "-"
-    namespace = "ns"
     base_path = "/extracts/zkillboard_rdp"
 
     def __init__(self, regions, epoch_datetime, pages, end_datetime=datetime.datetime.max):
