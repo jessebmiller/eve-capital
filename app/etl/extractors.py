@@ -33,6 +33,7 @@ import datetime
 import json
 import os
 import requests
+from helpers import FileDict
 
 
 class JsonFileExtractor:
@@ -50,7 +51,7 @@ class JsonFileExtractor:
         raise NotImplementedError
 
     def data(self):
-        for extract_id in self.completed():
+        for extract_id in self.completed().intersection(self.expected()):
             with open(os.path.join(self.base_path, extract_id), 'r') as f:
                 d = f.read()
                 for x in json.loads(d):
@@ -66,6 +67,82 @@ class JsonFileExtractor:
             self.extract(extract_id)
         return self
 
+
+class CrestMarketHistoryExtractor(JsonFileExtractor):
+    """
+    Market History by region, item and date
+
+    """
+
+    base_path = "/extracts/crest_market_histories"
+
+    def __init__(self, regions, items, use_existing=False):
+        self.use_existing = False
+        self.regions = regions
+        self.items = items
+
+    def expected(self):
+        if self.use_existing:
+            return self.completed()
+        extract_ids = [
+            self.separator.join([
+                self.namespace,
+                datetime.date.today().isoformat(),
+                str(r),
+                str(i),
+            ])
+            for r in self.regions
+            for i in self.items
+        ]
+
+        return set(extract_ids)
+
+    def extract(self, extract_id):
+        path = "/market/{}/history/?type=https://crest-tq.eveonline.com/inventory/types/{}/"
+        host = "https://crest-tq.eveonline.com"
+        ns, dt, region, item = extract_id.split(self.separator)
+        url = host + path.format(region, item)
+        print("requesting", url)
+        resp = requests.get(url)
+        if resp.status_code != 200:
+            print (resp.json())
+            return True
+        histories = resp.json()['items']
+        print("got", len(histories), "histories")
+        for history in histories:
+            history['typeID'] = item
+            history['regionID'] = region
+        with open(os.path.join(self.base_path, extract_id), 'w') as f:
+            f.write(json.dumps(histories))
+        return True
+
+
+class CrestMarketStatsExtractor(JsonFileExtractor):
+    """
+    Crest market stats once a day.
+
+    """
+
+    base_path = "/extracts/crest_market_stats"
+
+    def expected(self):
+        extract_ids = [self.separator.join([
+            self.namespace,
+            datetime.date.today().isoformat(),
+        ])]
+        return set(extract_ids)
+
+    def extract(self, extract_id):
+        url = "https://crest-tq.eveonline.com/market/prices/"
+        print("requesting:", url)
+        resp = requests.get(url)
+        if resp.status_code != 200:
+            return False
+        stats = resp.json()['items']
+        print("got {} stats".format(len(stats)))
+        with open(os.path.join(self.base_path, extract_id), 'w') as f:
+            f.write(json.dumps(stats))
+        return True
 
 class CrestOrderSnapshotExtractor(JsonFileExtractor):
     """
@@ -85,6 +162,7 @@ class CrestOrderSnapshotExtractor(JsonFileExtractor):
     base_path = "/extracts/crest_order_snapshot"
     host = "https://crest-tq.eveonline.com"
     path = "/market/{}/orders/{}/?type=https://crest-tq.eveonline.com/inventory/types/{}/"
+    use_existing = False
 
     def __init__(self, regions, item_ids, order_types=["buy", "sell"]):
         self.item_ids = item_ids
@@ -92,6 +170,8 @@ class CrestOrderSnapshotExtractor(JsonFileExtractor):
         self.order_types = order_types
 
     def expected(self):
+        if self.use_existing:
+            return self.completed()
         time_replacements = {}
         if self.year:
             time_replacements['year'] = 9999
@@ -176,10 +256,6 @@ class ZKillboardRDPExtractor(JsonFileExtractor):
             for p in range(self.pages)
         ]
         extract_ids = (self.separator.join(x) for x in extract_space)
-        return set(extract_ids)
-
-    def completed(self):
-        extract_ids = os.listdir(self.base_path)
         return set(extract_ids)
 
     def extract(self, extract_id):
