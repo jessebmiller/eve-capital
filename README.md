@@ -1,2 +1,2 @@
-# eve-supply
-Exploring supply and demand in Eve Online.
+# eve-capital
+Capital management for Eve Online.
