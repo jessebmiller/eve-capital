@@ -1,3 +1,3 @@
 from python:onbuild
-run mkdir -p /extracts/zkillboard_rdp
+run python -m unittest
 cmd ["python", "app"]
